@@ -1,0 +1,2 @@
+# stock
+just stock init
