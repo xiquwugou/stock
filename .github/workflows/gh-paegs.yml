@@ -2,7 +2,7 @@ name: Deploy photo-stream to GitHub Pages
 
 on:
   push:
-    branches: [ master ]   # 或 main，按你的默认分支改
+    branches: stock   # 或 main，按你的默认分支改
   workflow_dispatch: {}
 
 permissions:
