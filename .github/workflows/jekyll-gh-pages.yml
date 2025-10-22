@@ -1,0 +1,77 @@
+name: Deploy photo-stream to GitHub Pages
+
+on:
+  push:
+    branches: stock   # 或 main，按你的默认分支改
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v4
+
+      - name: Pull docker image
+        run: docker pull waschinski/photo-stream:latest
+
+      # 方式A：镜像里已有打包好的静态站点（常见在 /usr/share/nginx/html）
+      # 如果路径不同，下面这一步把源路径改成镜像内真实目录即可。
+      - name: Extract static site from container
+        run: |
+          set -eux
+          docker create --name ps waschinski/photo-stream:latest
+          mkdir -p _site
+          # 试拷这两个常见目录中的一个；若第一个不存在不会失败（加了 || true）
+          docker cp ps:/usr/share/nginx/html _site || true
+          docker cp ps:/app/build _site || true
+          # 若两个目录都为空，给出镜像内目录结构提示
+          if [ ! -d "_site/html" ] && [ ! -d "_site/build" ] && [ -z "$(ls -A _site || true)" ]; then
+            echo "Could not find static files in /usr/share/nginx/html or /app/build."
+            echo "Run locally: docker run --rm -it waschinski/photo-stream:latest sh -lc 'ls -laR /'"
+            exit 1
+          fi
+          # 规范化：将拷出的子目录提升为 _site 根
+          if [ -d "_site/html" ]; then rsync -a _site/html/ _site/ && rm -rf _site/html; fi
+          if [ -d "_site/build" ]; then rsync -a _site/build/ _site/ && rm -rf _site/build; fi
+          docker rm -f ps
+
+      # 如果你的镜像需要“生成静态文件”（而不是内置现成页面），
+      # 可改用方式B：把本仓库内容/照片挂进容器并让容器输出到 _site/
+      # - name: Generate site via container (方式B示例)
+      #   run: |
+      #     mkdir -p _site
+      #     docker run --rm \
+      #       -v "$PWD/content:/input:ro" \   # 挂载你的图片或配置目录
+      #       -v "$PWD/_site:/output" \
+      #       waschinski/photo-stream:latest \
+      #       sh -lc 'photo-stream build /input /output'  # 按镜像实际命令修改
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
