@@ -1,5 +1,10 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
 # Sample workflow for building and deploying a Jekyll site to GitHub Pages
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Deploy Jekyll site to Pages
 
 on:
   # Runs on pushes targeting the default branch
@@ -24,19 +29,33 @@ concurrency:
 jobs:
   # Build job
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@55283cc23133118229fd3f97f9336ee23a179fcf # v1.146.0
         with:
-          source: ./
-          destination: ./_site
+          ruby-version: '3.1' # Not needed with a .ruby-version file
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+          cache-version: 0 # Increment this number if you need to re-download cached gems
+      - name: Install libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v4
+      - name: Build with Jekyll
+        # Outputs to the './_site' directory by defaul
+        run:  bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}" 
+      - name: echo baseurl log
+        run:  echo "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        # Automatically uploads an artifact from the './_site' directory by default
+        uses: actions/upload-pages-artifact@v4
 
   # Deployment job
   deploy:
@@ -48,4 +67,16 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v2   # after remove test 
+      - name: deploy to render  # after remove test 
+        uses: ttskch/render-deploy@v1.0.0
+        with:
+          api-key: rnd_2VNe9TJ1Auhn7R1v1Df3d87Bap1c
+          service-id: srv-ck0rd7b6fquc73a4qu30
+      - name: deploy to Vercel  # after remove test 
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: xjE70mdtbGAHHdCEKEUHhviV # Required
+          vercel-project-id: prj_e6xKgEpy0pD871bdqEy2YqAWJLa2 #Required 
+
+        
